@@ -10,9 +10,6 @@ import android.graphics.Color;
 import android.graphics.DashPathEffect;
 import android.graphics.Paint;
 import android.graphics.Path;
-import android.graphics.Point;
-import android.graphics.Rect;
-import android.graphics.RectF;
 import android.support.v7.app.AlertDialog;
 import android.util.AttributeSet;
 import android.util.Log;
@@ -30,18 +27,18 @@ public class FreeHandCropView extends View implements View.OnTouchListener {
     int DIST = 2;
     boolean flgPathDraw = true;
 
-    Point mfirstpoint = null;
-    boolean bfirstpoint = false;
+    Point firstPoint = null;
+    boolean bFirstPoint = false;
 
-    Point mlastpoint = null;
+    Point lastPoint = null;
 
     Bitmap bitmap = BitmapFactory.decodeResource(getResources(), R.mipmap.picture);
-    Context mContext;
+    Context context;
 
     public FreeHandCropView(Context c) {
         super(c);
 
-        mContext = c;
+        context = c;
         setFocusable(true);
         setFocusableInTouchMode(true);
 
@@ -54,12 +51,12 @@ public class FreeHandCropView extends View implements View.OnTouchListener {
         this.setOnTouchListener(this);
         points = new ArrayList<Point>();
 
-        bfirstpoint = false;
+        bFirstPoint = false;
     }
 
     public FreeHandCropView(Context context, AttributeSet attrs) {
         super(context, attrs);
-        mContext = context;
+        this.context = context;
         setFocusable(true);
         setFocusableInTouchMode(true);
 
@@ -70,7 +67,7 @@ public class FreeHandCropView extends View implements View.OnTouchListener {
 
         this.setOnTouchListener(this);
         points = new ArrayList<Point>();
-        bfirstpoint = false;
+        bFirstPoint = false;
 
     }
 
@@ -89,7 +86,7 @@ public class FreeHandCropView extends View implements View.OnTouchListener {
                 Point next = points.get(i + 1);
                 path.quadTo(point.x, point.y, next.x, next.y);
             } else {
-                mlastpoint = points.get(i);
+                lastPoint = points.get(i);
                 path.lineTo(point.x, point.y);
             }
         }
@@ -106,13 +103,13 @@ public class FreeHandCropView extends View implements View.OnTouchListener {
 
         if (flgPathDraw) {
 
-            if (bfirstpoint) {
+            if (bFirstPoint) {
 
-                if (comparepoint(mfirstpoint, point)) {
+                if (comparePoint(firstPoint, point)) {
                     // points.add(point);
-                    points.add(mfirstpoint);
+                    points.add(firstPoint);
                     flgPathDraw = false;
-                    showcropdialog();
+                    showCropDialog();
                 } else {
                     points.add(point);
                 }
@@ -120,10 +117,10 @@ public class FreeHandCropView extends View implements View.OnTouchListener {
                 points.add(point);
             }
 
-            if (!(bfirstpoint)) {
+            if (!(bFirstPoint)) {
 
-                mfirstpoint = point;
-                bfirstpoint = true;
+                firstPoint = point;
+                bFirstPoint = true;
             }
         }
 
@@ -132,13 +129,13 @@ public class FreeHandCropView extends View implements View.OnTouchListener {
 
         if (event.getAction() == MotionEvent.ACTION_UP) {
             Log.d("Action up***>", "called");
-            mlastpoint = point;
+            lastPoint = point;
             if (flgPathDraw) {
                 if (points.size() > 12) {
-                    if (!comparepoint(mfirstpoint, mlastpoint)) {
+                    if (!comparePoint(firstPoint, lastPoint)) {
                         flgPathDraw = false;
-                        points.add(mfirstpoint);
-                        showcropdialog();
+                        points.add(firstPoint);
+                        showCropDialog();
                     }
                 }
             }
@@ -147,7 +144,7 @@ public class FreeHandCropView extends View implements View.OnTouchListener {
         return true;
     }
 
-    private boolean comparepoint(Point first, Point current) {
+    private boolean comparePoint(Point first, Point current) {
         int left_range_x = (int) (current.x - 3);
         int left_range_y = (int) (current.y - 3);
 
@@ -184,7 +181,7 @@ public class FreeHandCropView extends View implements View.OnTouchListener {
         invalidate();
     }
 
-    private void showcropdialog() {
+    private void showCropDialog() {
         DialogInterface.OnClickListener dialogClickListener = new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
@@ -194,19 +191,19 @@ public class FreeHandCropView extends View implements View.OnTouchListener {
                         // Yes button clicked
                         // bfirstpoint = false;
 
-                        intent = new Intent(mContext, MainActivity.class);
+                        intent = new Intent(context, CropActivity.class);
                         intent.putExtra("crop", true);
-                        mContext.startActivity(intent);
+                        context.startActivity(intent);
                         break;
 
                     case DialogInterface.BUTTON_NEGATIVE:
                         // No button clicked
 
-                        intent = new Intent(mContext, MainActivity.class);
+                        intent = new Intent(context, CropActivity.class);
                         intent.putExtra("crop", false);
-                        mContext.startActivity(intent);
+                        context.startActivity(intent);
 
-                        bfirstpoint = false;
+                        bFirstPoint = false;
                         // resetView();
 
                         break;
@@ -214,10 +211,21 @@ public class FreeHandCropView extends View implements View.OnTouchListener {
             }
         };
 
-        AlertDialog.Builder builder = new AlertDialog.Builder(mContext);
+        AlertDialog.Builder builder = new AlertDialog.Builder(context);
         builder.setMessage("Do you Want to save Crop or Non-crop image?")
                 .setPositiveButton("Crop", dialogClickListener)
                 .setNegativeButton("Non-crop", dialogClickListener).show()
                 .setCancelable(false);
+    }
+
+    class Point {
+        public float dy;
+        public float dx;
+        float x, y;
+
+        @Override
+        public String toString(){
+            return x + ", " + y;
+        }
     }
 }
