@@ -3,8 +3,8 @@ package jp.itnav.freehandcropsample;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.DashPathEffect;
@@ -12,15 +12,22 @@ import android.graphics.Paint;
 import android.graphics.Path;
 import android.support.v7.app.AlertDialog;
 import android.util.AttributeSet;
+import android.util.Base64;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
+import android.widget.ImageView;
 
+import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
 
-public class FreeHandCropView extends View implements View.OnTouchListener {
+public class FreeHandCropView extends ImageView implements View.OnTouchListener {
+    public static final String INTENT_KEY_CROP = "crop";
+    public static final String CACHE_DATA_NAME = "cache";
+    public static final String CACHE_KEY = "bitmap";
+
     private Paint paint;
     public static List<Point> points;
     int DIST = 2;
@@ -31,10 +38,10 @@ public class FreeHandCropView extends View implements View.OnTouchListener {
 
     Point lastPoint = null;
 
-    Bitmap bitmap = BitmapFactory.decodeResource(getResources(), R.mipmap.picture);
+    private final Bitmap bitmap;// = BitmapFactory.decodeResource(getResources(), R.mipmap.image);
     Context context;
 
-    public FreeHandCropView(Context c) {
+    public FreeHandCropView(Context c, Bitmap bm) {
         super(c);
 
         context = c;
@@ -48,12 +55,13 @@ public class FreeHandCropView extends View implements View.OnTouchListener {
         paint.setColor(Color.WHITE);
 
         this.setOnTouchListener(this);
-        points = new ArrayList<Point>();
+        points = new ArrayList<>();
 
         bFirstPoint = false;
+        this.bitmap = bm;
     }
 
-    public FreeHandCropView(Context context, AttributeSet attrs) {
+    public FreeHandCropView(Context context, AttributeSet attrs, Bitmap bm) {
         super(context, attrs);
         this.context = context;
         setFocusable(true);
@@ -65,31 +73,32 @@ public class FreeHandCropView extends View implements View.OnTouchListener {
         paint.setColor(Color.WHITE);
 
         this.setOnTouchListener(this);
-        points = new ArrayList<Point>();
+        points = new ArrayList<>();
         bFirstPoint = false;
-
+        this.bitmap = bm;
     }
 
     public void onDraw(Canvas canvas) {
         canvas.drawBitmap(bitmap, 0, 0, null);
 
-        Path path = new Path();
-        boolean first = true;
+        Path cropAreaPath = new Path();
+        boolean isFirstPoint = true;
 
         for (int i = 0; i < points.size(); i += 2) {
             Point point = points.get(i);
-            if (first) {
-                first = false;
-                path.moveTo(point.x, point.y);
+            if (isFirstPoint) {
+                isFirstPoint = false;
+                // 最初の処理でPathのx,y座標をpointの座標に移動する
+                cropAreaPath.moveTo(point.x, point.y);
             } else if (i < points.size() - 1) {
                 Point next = points.get(i + 1);
-                path.quadTo(point.x, point.y, next.x, next.y);
+                cropAreaPath.quadTo(point.x, point.y, next.x, next.y);
             } else {
                 lastPoint = points.get(i);
-                path.lineTo(point.x, point.y);
+                cropAreaPath.lineTo(point.x, point.y);
             }
         }
-        canvas.drawPath(path, paint);
+        canvas.drawPath(cropAreaPath, paint);
     }
 
     public boolean onTouch(View view, MotionEvent event) {
@@ -101,9 +110,7 @@ public class FreeHandCropView extends View implements View.OnTouchListener {
         point.y = (int) event.getY();
 
         if (flgPathDraw) {
-
             if (bFirstPoint) {
-
                 if (comparePoint(firstPoint, point)) {
                     // points.add(point);
                     points.add(firstPoint);
@@ -191,7 +198,7 @@ public class FreeHandCropView extends View implements View.OnTouchListener {
                         // bfirstpoint = false;
 
                         intent = new Intent(context, CropActivity.class);
-                        intent.putExtra("crop", true);
+                        intent.putExtra(INTENT_KEY_CROP, true);
                         context.startActivity(intent);
                         break;
 
