@@ -10,6 +10,7 @@ import android.graphics.Color;
 import android.graphics.DashPathEffect;
 import android.graphics.Paint;
 import android.graphics.Path;
+import android.support.v4.util.LruCache;
 import android.support.v7.app.AlertDialog;
 import android.util.AttributeSet;
 import android.util.Base64;
@@ -25,7 +26,6 @@ import java.util.List;
 
 public class FreeHandCropView extends ImageView implements View.OnTouchListener {
     public static final String INTENT_KEY_CROP = "crop";
-    public static final String CACHE_DATA_NAME = "cache";
     public static final String CACHE_KEY = "bitmap";
 
     private Paint paint;
@@ -38,8 +38,15 @@ public class FreeHandCropView extends ImageView implements View.OnTouchListener 
 
     Point lastPoint = null;
 
-    private final Bitmap bitmap;// = BitmapFactory.decodeResource(getResources(), R.mipmap.image);
+    private final Bitmap cropImageBitmap;
     Context context;
+
+    private static LruCache<String, Bitmap> mMemoryCache;
+
+
+    public static Bitmap getBitmapFromMemCache() {
+        return mMemoryCache.get(CACHE_KEY);
+    }
 
     public FreeHandCropView(Context c, Bitmap bm) {
         super(c);
@@ -58,7 +65,19 @@ public class FreeHandCropView extends ImageView implements View.OnTouchListener 
         points = new ArrayList<>();
 
         bFirstPoint = false;
-        this.bitmap = bm;
+        this.cropImageBitmap = bm;
+
+        final int maxMemory = (int) (Runtime.getRuntime().maxMemory() / 1024);
+        final int cacheSize = maxMemory / 8;
+        mMemoryCache = new LruCache<String, Bitmap>(cacheSize) {
+            @Override
+            protected int sizeOf(String key, Bitmap bitmap) {
+                // The cache size will be measured in kilobytes rather than
+                // number of items.
+                return bitmap.getByteCount() / 1024;
+            }
+        };
+
     }
 
     public FreeHandCropView(Context context, AttributeSet attrs, Bitmap bm) {
@@ -75,11 +94,17 @@ public class FreeHandCropView extends ImageView implements View.OnTouchListener 
         this.setOnTouchListener(this);
         points = new ArrayList<>();
         bFirstPoint = false;
-        this.bitmap = bm;
+        this.cropImageBitmap = bm;
+    }
+
+    public void addBitmapToMemoryCache(Bitmap bitmap) {
+        if (getBitmapFromMemCache() == null) {
+            mMemoryCache.put(CACHE_KEY, bitmap);
+        }
     }
 
     public void onDraw(Canvas canvas) {
-        canvas.drawBitmap(bitmap, 0, 0, null);
+        canvas.drawBitmap(cropImageBitmap, 0, 0, null);
 
         Path cropAreaPath = new Path();
         boolean isFirstPoint = true;
@@ -188,6 +213,7 @@ public class FreeHandCropView extends ImageView implements View.OnTouchListener 
     }
 
     private void showCropDialog() {
+        addBitmapToMemoryCache(this.cropImageBitmap);
         DialogInterface.OnClickListener dialogClickListener = new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
