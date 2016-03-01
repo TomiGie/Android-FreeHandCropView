@@ -3,23 +3,24 @@ package jp.itnav.freehandcropsample;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.DashPathEffect;
 import android.graphics.Paint;
 import android.graphics.Path;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffXfermode;
+import android.graphics.Rect;
+import android.graphics.RectF;
 import android.support.v4.util.LruCache;
 import android.support.v7.app.AlertDialog;
 import android.util.AttributeSet;
-import android.util.Base64;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.ImageView;
 
-import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -28,19 +29,17 @@ public class FreeHandCropView extends ImageView implements View.OnTouchListener 
     public static final String INTENT_KEY_CROP = "crop";
     public static final String CACHE_KEY = "bitmap";
 
-    private Paint paint;
     public static List<Point> points;
-    int DIST = 2;
     boolean flgPathDraw = true;
-
-    Point firstPoint = null;
     boolean bFirstPoint = false;
+    private Point firstPoint = null;
+    private Point lastPoint = null;
 
-    Point lastPoint = null;
-
-    private final Bitmap cropImageBitmap;
-    Context context;
-
+    private final Bitmap originalImageBitmap;
+    private int canvasWidth;
+    private int canvasHeight;
+    private Paint paint;
+    private Context context;
     private static LruCache<String, Bitmap> mMemoryCache;
 
 
@@ -65,7 +64,7 @@ public class FreeHandCropView extends ImageView implements View.OnTouchListener 
         points = new ArrayList<>();
 
         bFirstPoint = false;
-        this.cropImageBitmap = bm;
+        this.originalImageBitmap = bm;
 
         final int maxMemory = (int) (Runtime.getRuntime().maxMemory() / 1024);
         final int cacheSize = maxMemory / 8;
@@ -94,7 +93,7 @@ public class FreeHandCropView extends ImageView implements View.OnTouchListener 
         this.setOnTouchListener(this);
         points = new ArrayList<>();
         bFirstPoint = false;
-        this.cropImageBitmap = bm;
+        this.originalImageBitmap = bm;
     }
 
     public void addBitmapToMemoryCache(Bitmap bitmap) {
@@ -103,8 +102,51 @@ public class FreeHandCropView extends ImageView implements View.OnTouchListener 
         }
     }
 
+    private float calcBitmapScale(int canvasWidth, int canvasHeight, int bmpWidth, int bmpHeight) {
+
+        // 最初は幅で調べる
+        float scale = (float)canvasWidth / (float)bmpWidth;
+        float tmp = bmpHeight * scale;
+
+        // 画像の高さがキャンバスの高さより小さい（余白ができてしまう場合）高さの方で横幅をスケールする
+        if (tmp < canvasHeight) {
+            scale = (float)canvasHeight / (float)bmpHeight;
+            return scale;
+        }
+
+        return scale;
+    }
+
     public void onDraw(Canvas canvas) {
-        canvas.drawBitmap(cropImageBitmap, 0, 0, null);
+        // キャンバスのサイズ
+        canvasWidth = canvas.getWidth();
+        canvasHeight = canvas.getHeight();
+
+        // ビットマップのサイズ
+        int bmpWidth = this.originalImageBitmap.getWidth();
+        int bmpHeight = this.originalImageBitmap.getHeight();
+
+        // 画面サイズに合う様に縦横スケール値を求める（最大限画面に収まる様に努力する）
+        float toCanvasScale = this.calcBitmapScale(canvasWidth, canvasHeight, bmpWidth, bmpHeight);
+
+        // キャンバスの大きさに画像を合わせたときにサイズのずれがどれくらいあるか
+        float diffX = (bmpWidth * toCanvasScale - canvasWidth);
+        float diffY = (bmpHeight * toCanvasScale - canvasHeight);
+
+        // すみを残して中心から取り出す様にする
+        float addX = (diffX / toCanvasScale) / 2;
+        float addY = (diffY / toCanvasScale) / 2;
+
+        // Bitmapを表示する
+//        Paint paint = new Paint();
+        // 画像の切り取り位置を調整して画像の中心がキャンバスの中心に来る様にする
+        Rect rSrc = new Rect((int)addX, (int)addY,
+                (int)((canvasWidth / toCanvasScale) + addX), (int)((canvasHeight / toCanvasScale) + addY));
+        RectF rDest = new RectF(0, 0, canvasWidth, canvasHeight);
+//        canvas.drawBitmap(originalImageBitmap, rSrc, rDest, null);
+        // ----------
+
+        canvas.drawBitmap(originalImageBitmap, 0, 0, null);
 
         Path cropAreaPath = new Path();
         boolean isFirstPoint = true;
@@ -127,9 +169,6 @@ public class FreeHandCropView extends ImageView implements View.OnTouchListener 
     }
 
     public boolean onTouch(View view, MotionEvent event) {
-        // if(event.getAction() != MotionEvent.ACTION_DOWN)
-        // return super.onTouchEvent(event);
-
         Point point = new Point();
         point.x = (int) event.getX();
         point.y = (int) event.getY();
@@ -213,30 +252,22 @@ public class FreeHandCropView extends ImageView implements View.OnTouchListener 
     }
 
     private void showCropDialog() {
-        addBitmapToMemoryCache(this.cropImageBitmap);
+        Bitmap croppedImage = cropImage(this.originalImageBitmap);
+        addBitmapToMemoryCache(croppedImage);
         DialogInterface.OnClickListener dialogClickListener = new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
                 Intent intent;
                 switch (which) {
                     case DialogInterface.BUTTON_POSITIVE:
-                        // Yes button clicked
-                        // bfirstpoint = false;
-
                         intent = new Intent(context, CropActivity.class);
                         intent.putExtra(INTENT_KEY_CROP, true);
                         context.startActivity(intent);
                         break;
 
                     case DialogInterface.BUTTON_NEGATIVE:
-                        // No button clicked
-
-                        intent = new Intent(context, CropActivity.class);
-                        intent.putExtra("crop", false);
-                        context.startActivity(intent);
-
                         bFirstPoint = false;
-                        // resetView();
+                        resetView();
 
                         break;
                 }
@@ -246,8 +277,25 @@ public class FreeHandCropView extends ImageView implements View.OnTouchListener 
         AlertDialog.Builder builder = new AlertDialog.Builder(context);
         builder.setMessage("Do you Want to save Crop or Non-crop image?")
                 .setPositiveButton("Crop", dialogClickListener)
-                .setNegativeButton("Non-crop", dialogClickListener).show()
+                .setNegativeButton("Cancel", dialogClickListener).show()
                 .setCancelable(false);
+    }
+
+    private Bitmap cropImage(Bitmap image) {
+        Bitmap cropImage = Bitmap.createBitmap(canvasWidth, canvasHeight, image.getConfig());
+        Canvas canvas = new Canvas(cropImage);
+        Paint paint = new Paint();
+        paint.setAntiAlias(true);
+
+        Path path = new Path();
+        for (int i = 0; i < FreeHandCropView.points.size(); i++) {
+            path.lineTo(FreeHandCropView.points.get(i).x, FreeHandCropView.points.get(i).y);
+        }
+        canvas.drawPath(path, paint);
+        paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_IN));
+        canvas.drawBitmap(originalImageBitmap, 0, 0, paint);
+
+        return cropImage;
     }
 
     class Point {
