@@ -9,13 +9,6 @@
     android:paddingTop="@dimen/activity_vertical_margin"
     android:orientation="vertical"
     tools:context="jp.itnav.freehandcropsample.MainActivity"
+    android:id="@+id/container"
     android:gravity="center">
-
-    <jp.itnav.freehandcropsample.FreeHandCropView
-        android:id="@+id/edit_view"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:background="#cccccc"
-        android:scaleType="fitCenter"
-        android:adjustViewBounds="true"/>
 </LinearLayout>

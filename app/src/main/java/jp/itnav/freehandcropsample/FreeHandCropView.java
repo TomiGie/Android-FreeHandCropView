@@ -41,13 +41,18 @@ public class FreeHandCropView extends ImageView implements View.OnTouchListener 
     private Paint paint;
     private Context context;
     private static LruCache<String, Bitmap> mMemoryCache;
+    private final ImageCropListener imageCropListener;
 
+    public interface ImageCropListener {
+        void onClickDialogPositiveButton();
+        void onClickDialogNegativeButton();
+    }
 
     public static Bitmap getBitmapFromMemCache() {
         return mMemoryCache.get(CACHE_KEY);
     }
 
-    public FreeHandCropView(Context c, Bitmap bm) {
+    public FreeHandCropView(Context c, Bitmap bm, ImageCropListener listener) {
         super(c);
 
         context = c;
@@ -65,6 +70,7 @@ public class FreeHandCropView extends ImageView implements View.OnTouchListener 
 
         bFirstPoint = false;
         this.originalImageBitmap = bm;
+        this.imageCropListener = listener;
 
         final int maxMemory = (int) (Runtime.getRuntime().maxMemory() / 1024);
         final int cacheSize = maxMemory / 8;
@@ -79,7 +85,7 @@ public class FreeHandCropView extends ImageView implements View.OnTouchListener 
 
     }
 
-    public FreeHandCropView(Context context, AttributeSet attrs, Bitmap bm) {
+    public FreeHandCropView(Context context, AttributeSet attrs, Bitmap bm, ImageCropListener listener) {
         super(context, attrs);
         this.context = context;
         setFocusable(true);
@@ -94,6 +100,7 @@ public class FreeHandCropView extends ImageView implements View.OnTouchListener 
         points = new ArrayList<>();
         bFirstPoint = false;
         this.originalImageBitmap = bm;
+        this.imageCropListener = listener;
     }
 
     public void addBitmapToMemoryCache(Bitmap bitmap) {
@@ -137,16 +144,13 @@ public class FreeHandCropView extends ImageView implements View.OnTouchListener 
         float addX = (diffX / toCanvasScale) / 2;
         float addY = (diffY / toCanvasScale) / 2;
 
-        // Bitmapを表示する
-//        Paint paint = new Paint();
         // 画像の切り取り位置を調整して画像の中心がキャンバスの中心に来る様にする
         Rect rSrc = new Rect((int)addX, (int)addY,
                 (int)((canvasWidth / toCanvasScale) + addX), (int)((canvasHeight / toCanvasScale) + addY));
         RectF rDest = new RectF(0, 0, canvasWidth, canvasHeight);
-//        canvas.drawBitmap(originalImageBitmap, rSrc, rDest, null);
-        // ----------
 
-        canvas.drawBitmap(originalImageBitmap, 0, 0, null);
+        // Bitmapを表示する
+        canvas.drawBitmap(originalImageBitmap, rSrc, rDest, null);
 
         Path cropAreaPath = new Path();
         boolean isFirstPoint = true;
@@ -257,18 +261,15 @@ public class FreeHandCropView extends ImageView implements View.OnTouchListener 
         DialogInterface.OnClickListener dialogClickListener = new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
-                Intent intent;
                 switch (which) {
                     case DialogInterface.BUTTON_POSITIVE:
-                        intent = new Intent(context, CropActivity.class);
-                        intent.putExtra(INTENT_KEY_CROP, true);
-                        context.startActivity(intent);
+                        imageCropListener.onClickDialogPositiveButton();
                         break;
 
                     case DialogInterface.BUTTON_NEGATIVE:
                         bFirstPoint = false;
                         resetView();
-
+                        imageCropListener.onClickDialogNegativeButton();
                         break;
                 }
             }

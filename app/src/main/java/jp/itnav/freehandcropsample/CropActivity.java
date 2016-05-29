@@ -8,22 +8,18 @@ import android.widget.ImageView;
 
 public class CropActivity extends AppCompatActivity {
     ImageView imageView;
-    boolean crop;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_preview);
-        Bundle extras = getIntent().getExtras();
-        if (extras != null) {
-            crop = extras.getBoolean(FreeHandCropView.INTENT_KEY_CROP);
-            Log.d("MainActivity", "crop ---> " + crop);
-        }
         imageView = (ImageView) findViewById(R.id.cropped_image_view);
         setCroppedImage(imageView);
     }
 
     private void setCroppedImage(ImageView view) {
+        // FreeHandCropView切り取りされたBitmapがキャッシュに保存されているので
+        // BitMapを取り出してImageViewにセットする
         Bitmap croppedImage = FreeHandCropView.getBitmapFromMemCache();
         view.setImageBitmap(croppedImage);
     }
